@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生活物品供應鏈互動地圖</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ECharts & World Map GeoJSON -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/map/js/world.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #13131a;
+            color: #e2e8f0;
+        }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e1e2d; }
+        ::-webkit-scrollbar-thumb { background: #3f3f5a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #5c5c7d; }
+        .map-container {
+            background: radial-gradient(circle at center, #1e1e2d 0%, #13131a 100%);
+        }
+
+        /* 產品圖與 LOGO 樣式 */
+        .product-img-wrap {
+            position: relative;
+            background: linear-gradient(135deg, var(--cat-color-start, #1e1e2d) 0%, var(--cat-color-end, #13131a) 100%);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .product-img-wrap::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.15) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        .product-img-wrap .cat-icon {
+            font-size: 1.8rem;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+        }
+        .product-img-wrap .brand-tag {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            right: 2px;
+            font-size: 7px;
+            font-weight: 700;
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .logo-badge {
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3px;
+            overflow: hidden;
+        }
+        .logo-badge img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .logo-badge.text-only {
+            background: linear-gradient(135deg, #2a2a40, #1e1e2d);
+            color: #e2e8f0;
+            font-weight: 900;
+            font-size: 8px;
+            letter-spacing: 0.3px;
+            padding: 2px;
+            line-height: 1;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.08);
+        }
+
+        /* 動效 */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeInUp 0.4s ease-out; }
+
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+        }
+        .pulse-glow { animation: pulseGlow 2s infinite; }
+
+        .glass-card {
+            background: rgba(21, 21, 31, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* ================================================
+           響應式:產品詳細卡
+           Mobile (預設):底部抽屜,從下往上滑
+           Desktop (md+):右上角懸浮,從右往左滑
+           ================================================ */
+        #product-detail-card {
+            position: fixed;
+            inset: auto 0 0 0;
+            width: auto;
+            max-height: 78vh;
+            border-radius: 20px 20px 0 0;
+            overflow-y: auto;
+            overflow-x: hidden;
+            transform: translateY(calc(100% + 24px));
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            z-index: 50;
+        }
+        #product-detail-card.visible {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        /* 手機底部抽屜拖曳指示條 */
+        .drag-handle {
+            display: block;
+            width: 40px;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 2px;
+            margin: 10px auto -6px;
+            position: relative;
+            z-index: 25;
+        }
+        /* 關閉按鈕 */
+        .detail-close-btn {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            width: 32px;
+            height: 32px;
+            border-radius: 9999px;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 30;
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .detail-close-btn:hover { background: rgba(0,0,0,0.8); transform: scale(1.1); }
+
+        @media (min-width: 768px) {
+            #product-detail-card {
+                position: absolute;
+                inset: 24px 24px auto auto;
+                width: 320px;
+                max-height: calc(100vh - 48px);
+                border-radius: 12px;
+                transform: translateX(48px);
+                overflow-y: auto;
+                z-index: 20;
+            }
+            #product-detail-card.visible { transform: translateX(0); }
+            .drag-handle { display: none; }
+        }
+
+        /* ================================================
+           響應式:圖例說明 (手機縮小)
+           ================================================ */
+        #legend-box {
+            padding: 10px 12px;
+            font-size: 10px;
+        }
+        #legend-box h3 { font-size: 11px; }
+        #legend-box .legend-row { font-size: 10px; }
+        @media (min-width: 768px) {
+            #legend-box {
+                padding: 16px;
+                font-size: 12px;
+            }
+            #legend-box h3 { font-size: 14px; }
+            #legend-box .legend-row { font-size: 12px; }
+        }
+
+        /* ================================================
+           響應式:手機側邊欄滾動優化 + 觸控
+           ================================================ */
+        @media (max-width: 767px) {
+            /* 手機端放大觸控區、加粗間距 */
+            #item-list-container { padding: 12px; }
+            #item-list-container li { min-height: 72px; }
+            /* 標題區縮小 */
+            .sidebar-header { padding: 14px 18px; }
+            .sidebar-header h1 { font-size: 1.1rem; }
+            .sidebar-header p { font-size: 11px; }
+        }
+
+        /* 防止 iOS Safari 手機旋轉時異常滾動 */
+        html, body { overscroll-behavior: none; -webkit-overflow-scrolling: touch; }
+    </style>
+</head>
+<body class="h-screen w-full flex flex-col md:flex-row overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-full md:w-[420px] h-[45vh] md:h-full bg-[#181824] shadow-2xl flex flex-col z-10 border-r border-gray-800 relative z-30">
+        <div class="sidebar-header p-4 md:p-6 border-b border-gray-800 bg-gradient-to-br from-[#1a1a28] to-[#15151f]">
+            <h1 class="text-xl md:text-2xl font-black text-white tracking-wide flex items-center gap-2">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">生活物品</span>
+                <span>供應鏈</span>
+            </h1>
+            <p class="text-gray-400 text-xs md:text-sm mt-2 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span> 品牌發源地 ➔ <span class="w-2 h-2 rounded-full bg-green-500"></span> 實際製造地
+            </p>
+            <div class="mt-3 md:mt-4 flex items-center justify-between gap-2">
+                <div class="px-2.5 py-1.5 md:px-3 md:py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-[10px] md:text-xs text-blue-300 flex-1 flex items-center gap-1.5">
+                    <span class="text-sm md:text-base">🖱️</span> <span class="truncate">點擊產品可放大產線</span>
+                </div>
+                <button onclick="resetView()" class="px-2.5 py-1.5 md:px-3 md:py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-700 rounded-lg text-[10px] md:text-xs text-white transition-all flex items-center gap-1 shadow-sm shrink-0 hover:scale-105">
+                    🌍 <span class="hidden sm:inline">顯示</span>總覽
+                </button>
+            </div>
+        </div>
+
+        <div id="item-list-container" class="flex-1 overflow-y-auto p-5 space-y-4">
+            <!-- JS 動態生成 -->
+        </div>
+
+        <div class="p-4 border-t border-gray-800 bg-[#15151f] text-xs text-gray-500 text-center leading-relaxed">
+            <span class="inline-block w-3 border-b border-dashed border-gray-500 align-middle mr-1"></span> 設計與代工發包路徑
+            <span class="inline-block w-3 border-b border-solid border-blue-400 align-middle mr-1"></span> 實體產品運輸路徑
+        </div>
+    </aside>
+
+    <!-- Main Map -->
+    <main class="flex-1 h-[55vh] md:h-full relative map-container overflow-hidden">
+        <div id="echarts-map" class="w-full h-full"></div>
+
+        <!-- 產品詳細資訊卡 (手機:底部抽屜 / 桌面:右上懸浮) -->
+        <div id="product-detail-card" class="glass-card border border-gray-700 shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+            <!-- 手機抽屜拖曳條 -->
+            <span class="drag-handle"></span>
+            <!-- 關閉按鈕 -->
+            <button onclick="resetView()" class="detail-close-btn" aria-label="關閉">✕</button>
+            <!-- 大張產品圖 -->
+            <div id="product-hero-img" class="w-full h-44 md:h-40 relative overflow-hidden">
+                <!-- JS 動態填入 -->
+            </div>
+
+            <div class="p-5">
+                <!-- 標題與 Logo -->
+                <div class="flex items-center gap-3 mb-2">
+                    <span id="product-logo-container"></span>
+                    <div class="flex-1 min-w-0">
+                        <h2 id="product-title" class="font-bold text-white text-base truncate"></h2>
+                        <p id="product-brand-name" class="text-[11px] text-gray-400 truncate"></p>
+                    </div>
+                </div>
+
+                <!-- 價格 -->
+                <p id="product-price" class="text-blue-400 font-mono font-bold text-lg mb-3 border-b border-gray-700 pb-3"></p>
+
+                <!-- 簡短介紹 -->
+                <p id="product-desc" class="text-xs text-gray-300 leading-relaxed mb-4 bg-gray-800/40 p-2.5 rounded-lg border border-gray-700/50"></p>
+
+                <!-- 產地資訊 -->
+                <div class="text-xs text-gray-300 flex flex-col gap-2">
+                    <div class="flex justify-between items-center bg-gray-800/50 p-2 rounded-lg">
+                        <span class="text-gray-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>品牌設計</span>
+                        <span id="product-brand-route-origin" class="font-medium flex items-center gap-1"></span>
+                    </div>
+                    <div class="flex justify-between items-center bg-gray-800/50 p-2 rounded-lg">
+                        <span class="text-gray-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>代工製造</span>
+                        <span id="product-brand-route-mfg" class="font-medium flex items-center gap-1"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 圖例說明 -->
+        <div id="legend-box" class="absolute bottom-3 right-3 md:bottom-6 md:right-auto md:left-6 glass-card border border-gray-700 rounded-xl shadow-lg pointer-events-none z-20">
+            <h3 class="font-bold text-gray-200 mb-1.5 md:mb-2 border-b border-gray-700 pb-1">圖例說明</h3>
+            <ul class="space-y-0.5 md:space-y-1 text-gray-400">
+                <li class="legend-row flex items-center gap-2"><span class="w-3 h-3 rounded-full border-2 border-white shrink-0"></span> 品牌發源地</li>
+                <li class="legend-row flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-white shrink-0"></span> 實際製造地</li>
+                <li class="legend-row flex items-center gap-2 mt-1 pt-1 md:mt-2 md:pt-2 border-t border-gray-700"><span class="w-4 border-b-2 border-dashed border-gray-400 shrink-0"></span> 品牌委託製造路徑</li>
+                <li class="legend-row flex items-center gap-2"><span class="w-4 border-b-2 border-solid border-blue-400 relative shrink-0"><span class="absolute -right-1 -top-[3px] text-[8px] text-blue-400">▶</span></span> 產品終端運輸路徑</li>
+            </ul>
+        </div>
+    </main>
+
+    <script>
+        // --- 1. Data Definition ---
+        // 分類資料,每個分類有自己的顏色、圖示與漸層
+        const categories = {
+            "數位通訊與電腦硬體": { color: "#3b82f6", icon: "💻", gradStart: "#1e3a8a", gradEnd: "#0c1f4a" },
+            "視聽與電玩娛樂":       { color: "#f97316", icon: "🎮", gradStart: "#9a3412", gradEnd: "#431407" },
+            "日常穿搭與隨身配件":   { color: "#10b981", icon: "🎒", gradStart: "#065f46", gradEnd: "#022c22" },
+            "居家生活與家電":       { color: "#eab308", icon: "☕", gradStart: "#854d0e", gradEnd: "#422006" },
+            "交通與移動工具":       { color: "#a855f7", icon: "🚗", gradStart: "#6b21a8", gradEnd: "#2e1065" }
+        };
+
+        // 每個產品有自己的代表圖示 (emoji) 作為 fallback
+        // logo: 本地品牌 LOGO 圖片路徑 (images/logos/xxx.png)
+        // productImg: 本地產品圖片路徑 (images/products/xxx.png)
+        // logoText: 當 LOGO 圖載入失敗時顯示的文字 (中文品牌或冷門品牌用)
+        const itemsData = [
+            { name: "Samsung S24 Ultra", cat: "數位通訊與電腦硬體", brand: "韓國", mfg: "越南", brandName: "Samsung", logo: "images/logos/samsung.png", productImg: "images/products/samsung-s24-ultra.png", emoji: "📱", price: "NT$ 47,900", desc: "搭載強大 AI 運算能力與頂級影像系統的旗艦智慧型手機。" },
+            { name: "MSI GTX 1080 Ti", cat: "數位通訊與電腦硬體", brand: "台灣", mfg: "中國", brandName: "MSI", logo: "images/logos/msi.png", productImg: "images/products/msi-gtx-1080ti.png", emoji: "🎮", price: "NT$ 28,900", desc: "曾經的效能卡皇,專為極致遊戲體驗與高負載運算設計。" },
+            { name: "ROG Flow X13", cat: "數位通訊與電腦硬體", brand: "台灣", mfg: "中國", brandName: "ROG", logo: "images/logos/rog.png", productImg: "images/products/rog-flow-x13.png", emoji: "💻", price: "NT$ 42,900", desc: "主打極致輕薄與翻轉觸控,並支援強大外接顯卡的電競筆電。" },
+            { name: "AMD R9 9950X3D", cat: "數位通訊與電腦硬體", brand: "美國", mfg: "馬來西亞", brandName: "AMD", logo: "images/logos/amd.png", productImg: "images/products/amd-r9-9950x3d.png", emoji: "🔲", price: "NT$ 24,900", desc: "運用 3D V-Cache 封裝技術,帶來突破性遊戲效能的頂級處理器。" },
+            { name: "十銓 DDR5 16Gx2", cat: "數位通訊與電腦硬體", brand: "台灣", mfg: "台灣", brandName: "TeamGroup", logo: "images/logos/teamgroup.png", productImg: "images/products/teamgroup-ddr5.png", logoText: "十銓", emoji: "💾", price: "NT$ 4,500", desc: "具備高時脈與低延遲特性,專為次世代電腦打造的電競記憶體。" },
+            { name: "Sony PS5", cat: "視聽與電玩娛樂", brand: "日本", mfg: "中國", brandName: "Sony", logo: "images/logos/sony.png", productImg: "images/products/sony-ps5.png", emoji: "🎮", price: "NT$ 17,580", desc: "配備超高速 SSD 與光線追蹤技術,引領次世代遊戲體驗的主機。" },
+            { name: "Sony A6700", cat: "視聽與電玩娛樂", brand: "日本", mfg: "泰國", brandName: "Sony", logo: "images/logos/sony.png", productImg: "images/products/sony-a6700.png", emoji: "📷", price: "NT$ 41,980", desc: "內建 AI 智慧對焦與強大錄影規格的 APS-C 旗艦無反相機。" },
+            { name: "夏普 65吋 QLED TV", cat: "視聽與電玩娛樂", brand: "日本", mfg: "馬來西亞", brandName: "Sharp", logo: "images/logos/sharp.png", productImg: "images/products/sharp-qled-tv.png", emoji: "📺", price: "NT$ 39,900", desc: "採用量子點技術,展現驚豔色彩與極致對比的超大尺寸智慧電視。" },
+            { name: "Harman Kardon Luna", cat: "視聽與電玩娛樂", brand: "美國", mfg: "中國", brandName: "Harman Kardon", logo: "images/logos/harman-kardon.png", productImg: "images/products/harman-kardon-luna.png", emoji: "🔊", price: "NT$ 5,990", desc: "外觀設計簡約優雅,同時提供純淨渾厚音質的便攜式藍牙喇叭。" },
+            { name: "Technics EAH-AZ40", cat: "視聽與電玩娛樂", brand: "日本", mfg: "馬來西亞", brandName: "Technics", logo: "images/logos/technics.png", productImg: "images/products/technics-az40.png", emoji: "🎧", price: "NT$ 4,990", desc: "傳承日系聲學工藝,擁有清晰通話與舒適配戴感的真無線耳機。" },
+            { name: "VICTORINOX 斜背包", cat: "日常穿搭與隨身配件", brand: "瑞士", mfg: "越南", brandName: "VICTORINOX", logo: "images/logos/victorinox.png", productImg: "images/products/victorinox-bag.png", emoji: "🎒", price: "NT$ 3,500", desc: "融入瑞士軍刀強悍機能與多夾層收納設計的實用都會斜背包。" },
+            { name: "思夢樂 合成皮外套", cat: "日常穿搭與隨身配件", brand: "日本", mfg: "緬甸", brandName: "思夢樂", logo: "images/logos/shimamura.png", productImg: "images/products/shimamura-jacket.png", logoText: "思夢樂", emoji: "🧥", price: "NT$ 990", desc: "平易近人卻不失質感,輕鬆打造日系流行風格的百搭合成皮衣。" },
+            { name: "Borsalini 皮夾", cat: "日常穿搭與隨身配件", brand: "台灣", mfg: "中國", brandName: "Borsalini", logo: "images/logos/borsalini.png", productImg: "images/products/borsalini-wallet.png", logoText: "Borsalini", emoji: "👛", price: "NT$ 4,500", desc: "揉合義式浪漫與精緻皮革工藝,展現都會女性優雅的真皮皮夾。" },
+            { name: "Panasonic 咖啡機", cat: "居家生活與家電", brand: "日本", mfg: "中國", brandName: "Panasonic", logo: "images/logos/panasonic.png", productImg: "images/products/panasonic-coffee.png", emoji: "☕", price: "NT$ 25,900", desc: "具備自動研磨與精準溫控,讓居家輕鬆享受職人級咖啡的全自動機型。" },
+            { name: "BMW 118i M", cat: "交通與移動工具", brand: "德國", mfg: "德國", brandName: "BMW", logo: "images/logos/bmw.png", productImg: "images/products/bmw-118i.png", emoji: "🚗", price: "NT$ 1,760,000", desc: "兼具動感掀背造型與精準操控,體驗德系豪華駕駛樂趣的入門車款。" }
+        ];
+
+        const geoCoords = {
+            "台灣": [120.98, 23.97],
+            "韓國": [127.76, 35.90],
+            "越南": [108.27, 14.05],
+            "中國": [104.19, 35.86],
+            "馬來西亞": [101.97, 4.21],
+            "美國": [-95.71, 37.09],
+            "日本": [138.25, 36.20],
+            "泰國": [100.99, 15.87],
+            "瑞士": [8.22, 46.81],
+            "緬甸": [95.95, 21.91],
+            "德國": [10.45, 51.16]
+        };
+
+        // 國家對應的國旗
+        const countryCodes = {
+            "台灣": "tw", "韓國": "kr", "越南": "vn", "中國": "cn",
+            "馬來西亞": "my", "美國": "us", "日本": "jp", "泰國": "th",
+            "瑞士": "ch", "緬甸": "mm", "德國": "de"
+        };
+        const flags = {};
+        for (let [name, code] of Object.entries(countryCodes)) {
+            flags[name] = `https://flagcdn.com/w20/${code}.png`;
+        }
+
+        const flagImg = (country) => `<img src="${flags[country]}" class="inline-block w-4 h-[11px] rounded-[2px] object-cover align-middle shadow-sm">`;
+
+        // 系統狀態
+        let currentSelected = null;
+        let myChart = null;
+
+        // --- [核心改善] LOGO 與產品圖生成函式 ---
+
+        /**
+         * 生成品牌 LOGO 的 HTML (優先讀取本地圖 + 文字 fallback)
+         * 採「疊層 fallback」:文字 LOGO 永遠在底層渲染,圖片蓋在上面;
+         * 若圖片載入失敗,img 自動 display:none,露出底層的文字 LOGO。
+         */
+        function getBrandLogoHTML(item, sizeClass = 'w-11 h-11') {
+            const displayText = item.logoText || item.brandName;
+            const imgOverlay = item.logo
+                ? `<img src="${item.logo}" alt="${item.brandName}" loading="lazy"
+                        class="absolute inset-0 w-full h-full object-contain bg-white rounded-md p-0.5"
+                        onerror="this.style.display='none'">`
+                : '';
+            return `<div class="logo-badge text-only ${sizeClass} shrink-0 relative overflow-hidden">
+                        <span>${displayText}</span>
+                        ${imgOverlay}
+                    </div>`;
+        }
+
+        /**
+         * 生成產品圖片的 HTML (優先讀取本地圖 + SVG emoji fallback)
+         * 採「疊層 fallback」:類別漸層 + emoji 永遠在底層渲染;
+         * 實際產品圖蓋在上面,若載入失敗則自動隱藏,露出底層樣式。
+         */
+        function getProductImageHTML(item, sizeClass = 'w-16 h-16', showBrand = true) {
+            const cat = categories[item.cat];
+            const style = `--cat-color-start:${cat.gradStart};--cat-color-end:${cat.gradEnd};`;
+            const imgOverlay = item.productImg
+                ? `<img src="${item.productImg}" alt="${item.name}" loading="lazy"
+                        class="absolute inset-0 w-full h-full object-cover rounded-lg"
+                        onerror="this.style.display='none'">`
+                : '';
+            return `<div class="product-img-wrap ${sizeClass} shrink-0 flex items-center justify-center relative" style="${style}">
+                        <span class="cat-icon">${item.emoji}</span>
+                        ${showBrand ? `<span class="brand-tag">${item.brandName}</span>` : ''}
+                        ${imgOverlay}
+                    </div>`;
+        }
+
+        /**
+         * 產品詳細卡的大型 Hero 圖 (較精緻的視覺效果)
+         * 同樣採疊層 fallback:類別漸層背景 + 大 emoji 永遠在底,產品圖蓋上去
+         */
+        function getProductHeroImageHTML(item) {
+            const cat = categories[item.cat];
+            const style = `background: linear-gradient(135deg, ${cat.gradStart} 0%, ${cat.gradEnd} 100%);`;
+            const imgOverlay = item.productImg
+                ? `<img src="${item.productImg}" alt="${item.name}" loading="lazy"
+                        class="absolute inset-0 w-full h-full object-cover z-10"
+                        onerror="this.style.display='none'">`
+                : '';
+            return `
+                <div class="w-full h-full relative flex items-center justify-center" style="${style}">
+                    <div class="absolute inset-0" style="background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.2) 0%, transparent 50%);"></div>
+                    <div class="text-7xl" style="filter: drop-shadow(0 8px 20px rgba(0,0,0,0.5));">${item.emoji}</div>
+                    ${imgOverlay}
+                    <div class="absolute top-3 left-3 px-2 py-0.5 bg-black/40 backdrop-blur-sm rounded-full text-[10px] text-white/90 font-medium border border-white/10 z-20">
+                        ${cat.icon} ${item.cat}
+                    </div>
+                    <div class="absolute bottom-3 right-3 text-[10px] font-black tracking-wider text-white/70 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full z-20">
+                        ${item.brandName}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- 2. 預計算曲線弧度 ---
+        function initData() {
+            const routeCount = {};
+            itemsData.forEach(item => {
+                if (item.brand !== item.mfg) {
+                    const id = `${item.brand}-${item.mfg}`;
+                    routeCount[id] = (routeCount[id] || 0) + 1;
+                    item.bmCurve = 0.2 + (routeCount[id] * 0.05);
+                }
+                if (item.mfg !== "台灣") {
+                    const id = `${item.mfg}-台灣`;
+                    routeCount[id] = (routeCount[id] || 0) + 1;
+                    item.muCurve = -0.1 - (routeCount[id] * 0.06);
+                }
+            });
+        }
+
+        // --- 3. 點擊互動 ---
+        window.toggleItem = function(itemName) {
+            if (currentSelected === itemName) {
+                currentSelected = null;
+            } else {
+                currentSelected = itemName;
+            }
+            renderSidebar();
+            renderMap();
+            renderProductCard();
+        }
+
+        window.resetView = function() {
+            currentSelected = null;
+            renderSidebar();
+            renderMap();
+            renderProductCard();
+        }
+
+        // --- 4. 產品詳細資訊卡 ---
+        function renderProductCard() {
+            const card = document.getElementById('product-detail-card');
+
+            if (!currentSelected) {
+                card.classList.remove('visible');
+                return;
+            }
+
+            const item = itemsData.find(i => i.name === currentSelected);
+
+            // Hero 圖
+            document.getElementById('product-hero-img').innerHTML = getProductHeroImageHTML(item);
+
+            // 基本資訊
+            document.getElementById('product-title').textContent = item.name;
+            document.getElementById('product-brand-name').textContent = item.brandName;
+            document.getElementById('product-price').textContent = item.price;
+            document.getElementById('product-desc').textContent = item.desc;
+
+            // 標題旁的小 Logo
+            document.getElementById('product-logo-container').innerHTML = getBrandLogoHTML(item, 'w-10 h-10');
+
+            // 產地
+            document.getElementById('product-brand-route-origin').innerHTML = `${flagImg(item.brand)} <span class="ml-1">${item.brand}</span>`;
+            document.getElementById('product-brand-route-mfg').innerHTML = `${flagImg(item.mfg)} <span class="ml-1">${item.mfg}</span>`;
+
+            card.classList.add('visible');
+        }
+
+        // --- 5. 繪製側邊欄 ---
+        function renderSidebar() {
+            const container = document.getElementById('item-list-container');
+            const grouped = {};
+            Object.keys(categories).forEach(cat => grouped[cat] = []);
+            itemsData.forEach(item => grouped[item.cat].push(item));
+
+            let html = '';
+            for (const [catName, items] of Object.entries(grouped)) {
+                if(items.length === 0) continue;
+                const catInfo = categories[catName];
+
+                html += `
+                <div class="bg-[#1e1e2d] rounded-xl border border-gray-800 overflow-hidden shadow-sm">
+                    <div class="px-4 py-3 border-b border-gray-800 flex items-center gap-2" style="background-color: ${catInfo.color}15;">
+                        <span class="text-lg">${catInfo.icon}</span>
+                        <h3 class="font-bold text-sm tracking-wider" style="color: ${catInfo.color}">${catName}</h3>
+                        <span class="ml-auto text-[10px] text-gray-500 bg-gray-800/60 px-2 py-0.5 rounded-full">${items.length}</span>
+                    </div>
+                    <ul class="divide-y divide-gray-800">
+                `;
+
+                items.forEach(item => {
+                    const isSameOrigin = item.brand === item.mfg;
+                    const isSelected = currentSelected === item.name;
+                    const isOtherSelected = currentSelected !== null && !isSelected;
+
+                    const activeBg = isSelected ? 'bg-[#2a2a40] border-l-4' : 'hover:bg-[#252536] border-l-4 border-transparent';
+                    const opacityClass = isOtherSelected ? 'opacity-40' : 'opacity-100';
+
+                    // 產品圖 (左側大圖) + LOGO 浮水印 (右下角小徽章)
+                    const productImg = getProductImageHTML(item, 'w-16 h-16', true);
+                    const brandLogo = getBrandLogoHTML(item, 'w-8 h-8');
+
+                    html += `
+                        <li onclick="toggleItem('${item.name}')"
+                            class="px-4 py-3 cursor-pointer transition-all duration-300 group ${activeBg} ${opacityClass}"
+                            style="${isSelected ? `border-left-color: ${catInfo.color};` : ''}">
+                            <div class="flex items-center gap-3">
+                                <!-- 產品圖 + LOGO 徽章組合 -->
+                                <div class="relative shrink-0">
+                                    ${productImg}
+                                    <div class="absolute -bottom-1 -right-1 shadow-lg rounded-md">
+                                        ${brandLogo}
+                                    </div>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between items-start gap-2">
+                                        <div class="text-sm font-medium truncate ${isSelected ? 'text-white' : 'text-gray-200'}">${item.name}</div>
+                                        <div class="text-[11px] font-mono font-bold text-blue-300 whitespace-nowrap mt-0.5">${item.price}</div>
+                                    </div>
+                                    <div class="text-[10px] text-gray-500 truncate mt-0.5">${item.desc.slice(0, 26)}...</div>
+                                    <div class="flex items-center gap-1.5 mt-1.5 text-[11px]">
+                                        <span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 border border-gray-700 flex items-center gap-1">牌: ${flagImg(item.brand)} ${item.brand}</span>
+                                        ${!isSameOrigin ? `<span class="text-gray-600">➔</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-gray-700 text-white shadow-sm border border-gray-600 flex items-center gap-1">製: ${flagImg(item.mfg)} ${item.mfg}</span>` :
+                                        `<span class="px-1.5 py-0.5 rounded bg-green-900/40 text-green-400 border border-green-800 flex items-center gap-1">${flagImg(item.mfg)} 當地製造</span>`}
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                    `;
+                });
+                html += `</ul></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        // --- 6. 繪製地圖 ---
+        function renderMap() {
+            const inactiveBm = [];
+            const inactiveMu = [];
+            const activeBm = [];
+            const activeMu = [];
+            const scatterData = [];
+
+            itemsData.forEach(item => {
+                const color = categories[item.cat].color;
+                const isSelected = currentSelected === item.name;
+                const isOtherSelected = currentSelected !== null && !isSelected;
+
+                const opacity = isOtherSelected ? 0.05 : 0.6;
+                const width = 1.5;
+
+                const baseStyle = { color, curveness: item.bmCurve, width, opacity };
+                const activeStyle = { color, curveness: item.bmCurve, width: 4, opacity: 1, shadowBlur: 15, shadowColor: color };
+
+                if (item.brand !== item.mfg) {
+                    const dataObj = {
+                        coords: [geoCoords[item.brand], geoCoords[item.mfg]],
+                        value: item.name,
+                        detail: `【設計】${flagImg(item.brand)} ${item.brand} ➔ 【代工】${flagImg(item.mfg)} ${item.mfg}`
+                    };
+                    if (isSelected) activeBm.push({ ...dataObj, lineStyle: activeStyle });
+                    else inactiveBm.push({ ...dataObj, lineStyle: baseStyle });
+                }
+
+                if (item.mfg !== "台灣") {
+                    const dataObj = {
+                        coords: [geoCoords[item.mfg], geoCoords["台灣"]],
+                        value: item.name,
+                        detail: `【出貨】${flagImg(item.mfg)} ${item.mfg} ➔ 【使用】${flagImg("台灣")} 台灣`
+                    };
+                    if (isSelected) activeMu.push({ ...dataObj, lineStyle: { ...activeStyle, curveness: item.muCurve } });
+                    else inactiveMu.push({ ...dataObj, lineStyle: { ...baseStyle, curveness: item.muCurve } });
+                }
+            });
+
+            Object.keys(geoCoords).forEach(country => {
+                let symbolType = 'circle';
+                let symbolSize = 8;
+                let color = '#a1a1aa';
+
+                const isBrand = itemsData.some(i => i.brand === country);
+                const isMfg = itemsData.some(i => i.mfg === country);
+                const isTarget = country === "台灣";
+
+                if (isTarget) {
+                    symbolType = 'path://M512 341.5c-94.1 0-170.5 76.4-170.5 170.5s76.4 170.5 170.5 170.5 170.5-76.4 170.5-170.5-76.4-170.5-170.5-170.5z M512 85.5C276.4 85.5 85.5 276.4 85.5 512s190.9 426.5 426.5 426.5 426.5-190.9 426.5-426.5S747.6 85.5 512 85.5z';
+                    symbolSize = 25;
+                    color = '#ef4444';
+                } else if (isBrand && isMfg) {
+                    symbolType = 'roundRect'; symbolSize = 10; color = '#10b981';
+                } else if (isMfg) {
+                    symbolType = 'rect'; symbolSize = 8; color = '#fcd34d';
+                } else if (isBrand) {
+                    symbolType = 'emptyCircle'; symbolSize = 12; color = '#60a5fa';
+                }
+
+                let isRelated = true;
+                if (currentSelected) {
+                    const item = itemsData.find(i => i.name === currentSelected);
+                    isRelated = (country === item.brand || country === item.mfg || country === "台灣");
+                }
+
+                scatterData.push({
+                    name: country,
+                    value: [...geoCoords[country], 1],
+                    symbol: symbolType,
+                    symbolSize: (isRelated && currentSelected && !isTarget) ? symbolSize + 4 : symbolSize,
+                    itemStyle: {
+                        color: color,
+                        opacity: isRelated ? 1 : 0.15,
+                        borderWidth: isBrand && !isMfg ? 2 : 0,
+                        borderColor: isBrand && !isMfg ? color : 'transparent'
+                    }
+                });
+            });
+
+            const richConfig = {};
+            Object.keys(countryCodes).forEach(country => {
+                richConfig[countryCodes[country]] = {
+                    backgroundColor: { image: flags[country] },
+                    height: 11,
+                    width: 16,
+                    borderRadius: 2
+                };
+            });
+
+            let targetCenter = [110, 30];
+            let targetZoom = 1.6;
+
+            if (currentSelected) {
+                const item = itemsData.find(i => i.name === currentSelected);
+                const pts = [geoCoords[item.brand], geoCoords[item.mfg], geoCoords["台灣"]];
+
+                let minLng = Math.min(...pts.map(p=>p[0]));
+                let maxLng = Math.max(...pts.map(p=>p[0]));
+                let minLat = Math.min(...pts.map(p=>p[1]));
+                let maxLat = Math.max(...pts.map(p=>p[1]));
+
+                targetCenter = [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+
+                let maxDiff = Math.max(maxLng - minLng, maxLat - minLat);
+                targetZoom = Math.max(1, Math.min(100 / (maxDiff || 10), 4));
+            }
+
+            const option = {
+                backgroundColor: {
+                    type: 'radial',
+                    x: 0.5, y: 0.5, r: 0.8,
+                    colorStops: [
+                        { offset: 0, color: '#1e1e2d' },
+                        { offset: 1, color: '#13131a' }
+                    ]
+                },
+                animationDurationUpdate: 1000,
+                animationEasingUpdate: 'cubicInOut',
+                tooltip: {
+                    trigger: 'item',
+                    confine: true, // 手機上限制在畫面內,避免溢出
+                    backgroundColor: 'rgba(21, 21, 31, 0.95)',
+                    borderColor: '#3f3f5a',
+                    textStyle: { color: '#e2e8f0' },
+                    formatter: function (params) {
+                        if (params.seriesType === 'lines') {
+                            return `<div class="font-bold text-sm mb-1" style="color:${params.data.lineStyle.color}">${params.data.value}</div>
+                                    <div class="text-xs text-gray-400">${params.data.detail}</div>`;
+                        } else if (params.seriesType === 'scatter' || params.seriesType === 'effectScatter') {
+                            const country = params.data.name;
+                            const related = itemsData.filter(i => i.brand === country || i.mfg === country);
+                            let content = `<div class="font-bold text-sm mb-2 text-white border-b border-gray-600 pb-1 flex items-center gap-2">${flagImg(country)} ${country}</div>`;
+                            related.forEach(item => {
+                                let role = [];
+                                if(item.brand === country) role.push('品牌');
+                                if(item.mfg === country) role.push('製造');
+                                content += `<div class="text-xs mb-1 flex justify-between items-center gap-4"><span class="truncate"><span class="text-gray-400 mr-2">[${role.join('/')}]</span><span style="color:${categories[item.cat].color}">${item.name}</span></span> <span class="text-gray-500 font-mono text-[10px] whitespace-nowrap">${item.price}</span></div>`;
+                            });
+                            if (country === "台灣") {
+                                content += `<div class="text-xs mt-2 text-red-400 font-bold border-t border-gray-600 pt-1">★ 最終使用者所在地</div>`;
+                            }
+                            return content;
+                        }
+                    }
+                },
+                geo: {
+                    map: 'world',
+                    roam: true,
+                    center: targetCenter,
+                    zoom: targetZoom,
+                    label: { emphasis: { show: false } },
+                    itemStyle: { areaColor: '#252536', borderColor: '#3a3a52', borderWidth: 1 },
+                    emphasis: { itemStyle: { areaColor: '#34344a' } }
+                },
+                series: [
+                    {
+                        type: 'lines', zlevel: 1, effect: { show: false },
+                        lineStyle: { type: 'dashed' }, data: inactiveBm
+                    },
+                    {
+                        type: 'lines', zlevel: 10, effect: { show: false },
+                        lineStyle: { type: 'dashed' }, data: activeBm
+                    },
+                    {
+                        type: 'lines', zlevel: 2,
+                        effect: { show: currentSelected === null, period: 4, trailLength: 0, symbol: 'arrow', symbolSize: 5 },
+                        lineStyle: { type: 'solid' }, data: inactiveMu
+                    },
+                    {
+                        type: 'lines', zlevel: 11,
+                        effect: { show: true, period: 3, trailLength: 0.4, symbol: 'arrow', symbolSize: 10 },
+                        lineStyle: { type: 'solid' }, data: activeMu
+                    },
+                    {
+                        type: 'scatter', coordinateSystem: 'geo', zlevel: 20,
+                        label: {
+                            show: true, position: 'right',
+                            formatter: function(p) { return '{' + countryCodes[p.name] + '|} ' + p.name; },
+                            rich: richConfig,
+                            color: '#a1a1aa', fontSize: 10, textBorderColor: '#13131a', textBorderWidth: 2
+                        },
+                        data: scatterData.filter(d => d.name !== '台灣')
+                    },
+                    {
+                        type: 'effectScatter', coordinateSystem: 'geo', zlevel: 21,
+                        rippleEffect: { brushType: 'stroke', scale: 2.5 },
+                        label: {
+                            show: true, position: 'bottom',
+                            formatter: function(p) { return '{' + countryCodes[p.name] + '|} ' + p.name + ' (你)'; },
+                            rich: richConfig,
+                            color: '#ef4444', fontWeight: 'bold', textBorderColor: '#000', textBorderWidth: 2
+                        },
+                        itemStyle: { color: '#ef4444' },
+                        data: scatterData.filter(d => d.name === '台灣')
+                    }
+                ]
+            };
+
+            myChart.setOption(option);
+        }
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initData();
+            myChart = echarts.init(document.getElementById('echarts-map'));
+
+            // 響應式:視窗 / 手機旋轉時重新繪製地圖
+            let resizeTimer;
+            const handleResize = () => {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    myChart.resize();
+                    renderMap(); // 重繪以套用新的中心與縮放
+                }, 150);
+            };
+            window.addEventListener('resize', handleResize);
+            window.addEventListener('orientationchange', handleResize);
+
+            // ESC 鍵關閉產品詳細卡
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && currentSelected) {
+                    resetView();
+                }
+            });
+
+            renderSidebar();
+            renderMap();
+        });
+    </script>
+</body>
+</html>
