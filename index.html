@@ -229,7 +229,7 @@
             </p>
             <div class="mt-3 md:mt-4 flex items-center justify-between gap-2">
                 <div class="px-2.5 py-1.5 md:px-3 md:py-2 bg-blue-500/10 border border-blue-500/30 rounded-lg text-[10px] md:text-xs text-blue-300 flex-1 flex items-center gap-1.5">
-                    <span class="text-sm md:text-base">🖱️</span> <span class="truncate">點擊產品可放大產線</span>
+                    <span class="text-sm md:text-base">🖱️</span> <span class="truncate">點產品看產線・點國家看清單</span>
                 </div>
                 <button onclick="resetView()" class="px-2.5 py-1.5 md:px-3 md:py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 border border-gray-700 rounded-lg text-[10px] md:text-xs text-white transition-all flex items-center gap-1 shadow-sm shrink-0 hover:scale-105">
                     🌍 <span class="hidden sm:inline">顯示</span>總覽
@@ -257,37 +257,52 @@
             <span class="drag-handle"></span>
             <!-- 關閉按鈕 -->
             <button onclick="resetView()" class="detail-close-btn" aria-label="關閉">✕</button>
-            <!-- 大張產品圖 -->
-            <div id="product-hero-img" class="w-full h-44 md:h-40 relative overflow-hidden">
-                <!-- JS 動態填入 -->
-            </div>
-
-            <div class="p-5">
-                <!-- 標題與 Logo -->
-                <div class="flex items-center gap-3 mb-2">
-                    <span id="product-logo-container"></span>
-                    <div class="flex-1 min-w-0">
-                        <h2 id="product-title" class="font-bold text-white text-base truncate"></h2>
-                        <p id="product-brand-name" class="text-[11px] text-gray-400 truncate"></p>
-                    </div>
+            <!-- ============ 產品檢視 Product View ============ -->
+            <div id="product-view">
+                <!-- 大張產品圖 -->
+                <div id="product-hero-img" class="w-full h-44 md:h-40 relative overflow-hidden">
+                    <!-- JS 動態填入 -->
                 </div>
 
-                <!-- 價格 -->
-                <p id="product-price" class="text-blue-400 font-mono font-bold text-lg mb-3 border-b border-gray-700 pb-3"></p>
-
-                <!-- 簡短介紹 -->
-                <p id="product-desc" class="text-xs text-gray-300 leading-relaxed mb-4 bg-gray-800/40 p-2.5 rounded-lg border border-gray-700/50"></p>
-
-                <!-- 產地資訊 -->
-                <div class="text-xs text-gray-300 flex flex-col gap-2">
-                    <div class="flex justify-between items-center bg-gray-800/50 p-2 rounded-lg">
-                        <span class="text-gray-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>品牌設計</span>
-                        <span id="product-brand-route-origin" class="font-medium flex items-center gap-1"></span>
+                <div class="p-5">
+                    <!-- 標題與 Logo -->
+                    <div class="flex items-center gap-3 mb-2">
+                        <span id="product-logo-container"></span>
+                        <div class="flex-1 min-w-0">
+                            <h2 id="product-title" class="font-bold text-white text-base truncate"></h2>
+                            <p id="product-brand-name" class="text-[11px] text-gray-400 truncate"></p>
+                        </div>
                     </div>
-                    <div class="flex justify-between items-center bg-gray-800/50 p-2 rounded-lg">
-                        <span class="text-gray-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>代工製造</span>
-                        <span id="product-brand-route-mfg" class="font-medium flex items-center gap-1"></span>
+
+                    <!-- 價格 -->
+                    <p id="product-price" class="text-blue-400 font-mono font-bold text-lg mb-3 border-b border-gray-700 pb-3"></p>
+
+                    <!-- 簡短介紹 -->
+                    <p id="product-desc" class="text-xs text-gray-300 leading-relaxed mb-4 bg-gray-800/40 p-2.5 rounded-lg border border-gray-700/50"></p>
+
+                    <!-- 產地資訊 -->
+                    <div class="text-xs text-gray-300 flex flex-col gap-2">
+                        <div class="flex justify-between items-center bg-gray-800/50 p-2 rounded-lg">
+                            <span class="text-gray-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>品牌設計</span>
+                            <span id="product-brand-route-origin" class="font-medium flex items-center gap-1"></span>
+                        </div>
+                        <div class="flex justify-between items-center bg-gray-800/50 p-2 rounded-lg">
+                            <span class="text-gray-400 flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-green-400"></span>代工製造</span>
+                            <span id="product-brand-route-mfg" class="font-medium flex items-center gap-1"></span>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- ============ 國家檢視 Country View (新增) ============ -->
+            <div id="country-view" class="hidden">
+                <!-- 國家 Hero 區 -->
+                <div id="country-hero" class="w-full h-44 md:h-40 relative flex flex-col items-center justify-center overflow-hidden">
+                    <!-- JS 動態填入 (國旗、國名、角色標籤) -->
+                </div>
+                <div class="p-5">
+                    <div id="country-products-count" class="text-xs text-gray-400 mb-3 flex items-center gap-2"></div>
+                    <ul id="country-products-list" class="space-y-2 max-h-[42vh] md:max-h-[50vh] overflow-y-auto pr-1"></ul>
                 </div>
             </div>
         </div>
@@ -365,7 +380,8 @@
         const flagImg = (country) => `<img src="${flags[country]}" class="inline-block w-4 h-[11px] rounded-[2px] object-cover align-middle shadow-sm">`;
 
         // 系統狀態
-        let currentSelected = null;
+        let currentSelected = null;          // 選中的產品名稱
+        let currentSelectedCountry = null;   // 選中的國家名稱 (新增)
         let myChart = null;
 
         // --- [核心改善] LOGO 與產品圖生成函式 ---
@@ -454,6 +470,7 @@
 
         // --- 3. 點擊互動 ---
         window.toggleItem = function(itemName) {
+            currentSelectedCountry = null; // 選產品時清空國家選取
             if (currentSelected === itemName) {
                 currentSelected = null;
             } else {
@@ -464,41 +481,142 @@
             renderProductCard();
         }
 
-        window.resetView = function() {
-            currentSelected = null;
+        // 新增:點擊國家節點時觸發
+        window.toggleCountry = function(countryName) {
+            currentSelected = null; // 選國家時清空產品選取
+            if (currentSelectedCountry === countryName) {
+                currentSelectedCountry = null;
+            } else {
+                currentSelectedCountry = countryName;
+            }
             renderSidebar();
             renderMap();
             renderProductCard();
         }
 
-        // --- 4. 產品詳細資訊卡 ---
+        window.resetView = function() {
+            currentSelected = null;
+            currentSelectedCountry = null;
+            renderSidebar();
+            renderMap();
+            renderProductCard();
+        }
+
+        // --- 4. 產品/國家 詳細資訊卡 (統一派發) ---
         function renderProductCard() {
             const card = document.getElementById('product-detail-card');
+            const productView = document.getElementById('product-view');
+            const countryView = document.getElementById('country-view');
 
-            if (!currentSelected) {
+            // 都沒選取 → 隱藏卡片
+            if (!currentSelected && !currentSelectedCountry) {
                 card.classList.remove('visible');
                 return;
             }
 
+            if (currentSelected) {
+                // 顯示產品資訊
+                productView.classList.remove('hidden');
+                countryView.classList.add('hidden');
+                renderProductContent();
+            } else if (currentSelectedCountry) {
+                // 顯示國家資訊
+                productView.classList.add('hidden');
+                countryView.classList.remove('hidden');
+                renderCountryContent();
+            }
+
+            card.classList.add('visible');
+            // 重要:每次切換內容時滾動回頂部 (避免之前留下的捲動位置)
+            card.scrollTop = 0;
+        }
+
+        // 填入產品內容
+        function renderProductContent() {
             const item = itemsData.find(i => i.name === currentSelected);
-
-            // Hero 圖
             document.getElementById('product-hero-img').innerHTML = getProductHeroImageHTML(item);
-
-            // 基本資訊
             document.getElementById('product-title').textContent = item.name;
             document.getElementById('product-brand-name').textContent = item.brandName;
             document.getElementById('product-price').textContent = item.price;
             document.getElementById('product-desc').textContent = item.desc;
-
-            // 標題旁的小 Logo
             document.getElementById('product-logo-container').innerHTML = getBrandLogoHTML(item, 'w-10 h-10');
-
-            // 產地
             document.getElementById('product-brand-route-origin').innerHTML = `${flagImg(item.brand)} <span class="ml-1">${item.brand}</span>`;
             document.getElementById('product-brand-route-mfg').innerHTML = `${flagImg(item.mfg)} <span class="ml-1">${item.mfg}</span>`;
+        }
 
-            card.classList.add('visible');
+        // 填入國家內容 (新增)
+        function renderCountryContent() {
+            const country = currentSelectedCountry;
+            const related = itemsData.filter(i => i.brand === country || i.mfg === country);
+
+            const isBrand = related.some(i => i.brand === country);
+            const isMfg = related.some(i => i.mfg === country);
+            const isTaiwan = country === "台灣";
+
+            // 角色標籤
+            let roleTags = '';
+            if (isTaiwan) {
+                roleTags += `<span class="px-2 py-0.5 text-[10px] bg-red-500/30 text-red-200 rounded-full border border-red-400/40 font-bold">👤 你所在地</span>`;
+            }
+            if (isBrand) {
+                roleTags += `<span class="px-2 py-0.5 text-[10px] bg-blue-500/30 text-blue-200 rounded-full border border-blue-400/40 font-bold">🎨 品牌發源地</span>`;
+            }
+            if (isMfg) {
+                roleTags += `<span class="px-2 py-0.5 text-[10px] bg-yellow-500/30 text-yellow-200 rounded-full border border-yellow-400/40 font-bold">🏭 製造地</span>`;
+            }
+            if (!roleTags) {
+                roleTags = `<span class="px-2 py-0.5 text-[10px] bg-gray-700 text-gray-400 rounded-full border border-gray-600">中繼國</span>`;
+            }
+
+            // Hero (大國旗 + 國名 + 角色標籤)
+            const flagBigUrl = flags[country].replace('w20', 'w80');
+            const heroHTML = `
+                <div class="absolute inset-0" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);"></div>
+                <div class="absolute inset-0" style="background: radial-gradient(circle at 30% 30%, rgba(96,165,250,0.25) 0%, transparent 55%);"></div>
+                <img src="${flagBigUrl}" alt="${country}" class="w-20 h-auto rounded-md shadow-2xl mb-2 border-2 border-white/30 relative z-10" onerror="this.style.display='none'">
+                <h2 class="text-3xl font-black text-white relative z-10 tracking-widest" style="text-shadow: 0 2px 12px rgba(0,0,0,0.6);">${country}</h2>
+                <div class="flex gap-1.5 mt-2 relative z-10 flex-wrap justify-center px-3">${roleTags}</div>
+            `;
+            document.getElementById('country-hero').innerHTML = heroHTML;
+
+            // 數量計數
+            document.getElementById('country-products-count').innerHTML = `
+                <span class="inline-block w-6 h-px bg-gray-700"></span>
+                <span class="shrink-0">共 <span class="font-bold text-white">${related.length}</span> 項關聯產品</span>
+                <span class="inline-block flex-1 h-px bg-gray-700"></span>
+            `;
+
+            // 產品清單 (點擊可切換到產品檢視)
+            const listHTML = related.map(item => {
+                const isOrigin = item.brand === country;
+                const isMfgHere = item.mfg === country;
+                const catColor = categories[item.cat].color;
+
+                let roleLabel = '';
+                if (isOrigin && isMfgHere) {
+                    roleLabel = `<span class="text-green-400">✓ 本地品牌 · 本地製造</span>`;
+                } else if (isOrigin) {
+                    roleLabel = `<span class="text-blue-300">品牌</span> · 製於 ${flagImg(item.mfg)} ${item.mfg}`;
+                } else if (isMfgHere) {
+                    roleLabel = `${flagImg(item.brand)} ${item.brand} <span class="text-yellow-300">委託製造</span>`;
+                }
+
+                return `
+                    <li onclick="toggleItem('${item.name}')"
+                        class="cursor-pointer bg-gray-800/40 hover:bg-gray-800/80 active:bg-gray-700 p-2.5 rounded-lg border border-gray-700/50 hover:border-gray-600 transition-all flex items-center gap-3 group">
+                        <div class="shrink-0 relative">${getProductImageHTML(item, 'w-12 h-12', false)}</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start gap-2">
+                                <div class="text-sm font-medium text-white truncate group-hover:text-blue-300 transition-colors">${item.name}</div>
+                                <div class="text-[11px] font-mono font-bold text-blue-300 whitespace-nowrap mt-0.5">${item.price}</div>
+                            </div>
+                            <div class="text-[10px] truncate mt-1 flex items-center gap-1 text-gray-400">${roleLabel}</div>
+                            <div class="inline-block mt-1 text-[9px] px-1.5 py-0.5 rounded" style="background:${catColor}22; color:${catColor};">${categories[item.cat].icon} ${item.cat}</div>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+            document.getElementById('country-products-list').innerHTML = listHTML;
         }
 
         // --- 5. 繪製側邊欄 ---
@@ -526,9 +644,21 @@
                 items.forEach(item => {
                     const isSameOrigin = item.brand === item.mfg;
                     const isSelected = currentSelected === item.name;
-                    const isOtherSelected = currentSelected !== null && !isSelected;
+                    // 新增:與選中國家有關聯的產品也要強調
+                    const isCountryRelated = currentSelectedCountry && (item.brand === currentSelectedCountry || item.mfg === currentSelectedCountry);
+                    const hasSelection = currentSelected !== null || currentSelectedCountry !== null;
+                    const isHighlighted = isSelected || isCountryRelated;
+                    const isOtherSelected = hasSelection && !isHighlighted;
 
-                    const activeBg = isSelected ? 'bg-[#2a2a40] border-l-4' : 'hover:bg-[#252536] border-l-4 border-transparent';
+                    // 選取樣式:產品選取用漸層底,國家關聯用較淡的底色
+                    let activeBg;
+                    if (isSelected) {
+                        activeBg = 'bg-[#2a2a40] border-l-4';
+                    } else if (isCountryRelated) {
+                        activeBg = 'bg-[#222234] border-l-4';
+                    } else {
+                        activeBg = 'hover:bg-[#252536] border-l-4 border-transparent';
+                    }
                     const opacityClass = isOtherSelected ? 'opacity-40' : 'opacity-100';
 
                     // 產品圖 (左側大圖) + LOGO 浮水印 (右下角小徽章)
@@ -538,7 +668,7 @@
                     html += `
                         <li onclick="toggleItem('${item.name}')"
                             class="px-4 py-3 cursor-pointer transition-all duration-300 group ${activeBg} ${opacityClass}"
-                            style="${isSelected ? `border-left-color: ${catInfo.color};` : ''}">
+                            style="${isHighlighted ? `border-left-color: ${catInfo.color}${isCountryRelated && !isSelected ? '99' : ''};` : ''}">
                             <div class="flex items-center gap-3">
                                 <!-- 產品圖 + LOGO 徽章組合 -->
                                 <div class="relative shrink-0">
@@ -580,10 +710,14 @@
             itemsData.forEach(item => {
                 const color = categories[item.cat].color;
                 const isSelected = currentSelected === item.name;
-                const isOtherSelected = currentSelected !== null && !isSelected;
+                // 新增:此產品是否與選取的國家有關聯
+                const isCountryRelated = currentSelectedCountry && (item.brand === currentSelectedCountry || item.mfg === currentSelectedCountry);
+                const hasSelection = currentSelected !== null || currentSelectedCountry !== null;
+                const isRelated = isSelected || isCountryRelated;
+                const isOtherSelected = hasSelection && !isRelated;
 
-                const opacity = isOtherSelected ? 0.05 : 0.6;
-                const width = 1.5;
+                const opacity = isOtherSelected ? 0.05 : (isCountryRelated ? 0.85 : 0.6);
+                const width = isCountryRelated ? 2 : 1.5;
 
                 const baseStyle = { color, curveness: item.bmCurve, width, opacity };
                 const activeStyle = { color, curveness: item.bmCurve, width: 4, opacity: 1, shadowBlur: 15, shadowColor: color };
@@ -631,21 +765,35 @@
                 }
 
                 let isRelated = true;
+                const isSelectedCountry = country === currentSelectedCountry;
+
                 if (currentSelected) {
                     const item = itemsData.find(i => i.name === currentSelected);
                     isRelated = (country === item.brand || country === item.mfg || country === "台灣");
+                } else if (currentSelectedCountry) {
+                    // 選中某國家時,收集所有關聯的國家 (此國家 + 此國家產品的對側端 + 台灣)
+                    const relatedItems = itemsData.filter(i => i.brand === currentSelectedCountry || i.mfg === currentSelectedCountry);
+                    const relatedCountries = new Set(['台灣', currentSelectedCountry]);
+                    relatedItems.forEach(i => {
+                        relatedCountries.add(i.brand);
+                        relatedCountries.add(i.mfg);
+                    });
+                    isRelated = relatedCountries.has(country);
                 }
 
                 scatterData.push({
                     name: country,
                     value: [...geoCoords[country], 1],
                     symbol: symbolType,
-                    symbolSize: (isRelated && currentSelected && !isTarget) ? symbolSize + 4 : symbolSize,
+                    // 被選中國家放大並加白色描邊
+                    symbolSize: isSelectedCountry ? symbolSize + 10 : ((isRelated && currentSelected && !isTarget) ? symbolSize + 4 : symbolSize),
                     itemStyle: {
                         color: color,
                         opacity: isRelated ? 1 : 0.15,
-                        borderWidth: isBrand && !isMfg ? 2 : 0,
-                        borderColor: isBrand && !isMfg ? color : 'transparent'
+                        borderWidth: isSelectedCountry ? 3 : (isBrand && !isMfg ? 2 : 0),
+                        borderColor: isSelectedCountry ? '#ffffff' : (isBrand && !isMfg ? color : 'transparent'),
+                        shadowBlur: isSelectedCountry ? 20 : 0,
+                        shadowColor: isSelectedCountry ? '#ffffff' : 'transparent'
                     }
                 });
             });
@@ -676,6 +824,26 @@
 
                 let maxDiff = Math.max(maxLng - minLng, maxLat - minLat);
                 targetZoom = Math.max(1, Math.min(100 / (maxDiff || 10), 4));
+            } else if (currentSelectedCountry) {
+                // 選中國家時,依據此國家所有關聯產品的端點計算置中點
+                const relatedItems = itemsData.filter(i => i.brand === currentSelectedCountry || i.mfg === currentSelectedCountry);
+                const relatedCountries = new Set(['台灣', currentSelectedCountry]);
+                relatedItems.forEach(i => {
+                    relatedCountries.add(i.brand);
+                    relatedCountries.add(i.mfg);
+                });
+                const pts = Array.from(relatedCountries).map(c => geoCoords[c]).filter(Boolean);
+
+                if (pts.length > 0) {
+                    let minLng = Math.min(...pts.map(p=>p[0]));
+                    let maxLng = Math.max(...pts.map(p=>p[0]));
+                    let minLat = Math.min(...pts.map(p=>p[1]));
+                    let maxLat = Math.max(...pts.map(p=>p[1]));
+                    targetCenter = [(minLng + maxLng) / 2, (minLat + maxLat) / 2];
+                    let maxDiff = Math.max(maxLng - minLng, maxLat - minLat);
+                    // 國家模式用比較寬鬆的縮放 (最多 3x)
+                    targetZoom = Math.max(1, Math.min(100 / (maxDiff || 10), 3));
+                }
             }
 
             const option = {
@@ -777,6 +945,19 @@
             initData();
             myChart = echarts.init(document.getElementById('echarts-map'));
 
+            // 新增:點擊國家節點 → 顯示該國所有關聯產品
+            myChart.on('click', (params) => {
+                if (params.seriesType === 'scatter' || params.seriesType === 'effectScatter') {
+                    if (params.data && params.data.name && geoCoords[params.data.name]) {
+                        toggleCountry(params.data.name);
+                    }
+                }
+                // 點擊線條 → 顯示該產品
+                else if (params.seriesType === 'lines' && params.data && params.data.value) {
+                    toggleItem(params.data.value);
+                }
+            });
+
             // 響應式:視窗 / 手機旋轉時重新繪製地圖
             let resizeTimer;
             const handleResize = () => {
@@ -789,9 +970,9 @@
             window.addEventListener('resize', handleResize);
             window.addEventListener('orientationchange', handleResize);
 
-            // ESC 鍵關閉產品詳細卡
+            // ESC 鍵關閉詳細卡
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && currentSelected) {
+                if (e.key === 'Escape' && (currentSelected || currentSelectedCountry)) {
                     resetView();
                 }
             });
